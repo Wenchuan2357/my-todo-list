@@ -42,8 +42,32 @@
         /* 输入区域样式 */
         .input-section {
             display: flex;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             gap: 8px;
+        }
+        
+        /* 搜索区域样式 */
+        .search-section {
+            margin-bottom: 24px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s ease;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>');
+            background-repeat: no-repeat;
+            background-position: 12px center;
+            padding-left: 40px;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
         }
         
         .input-section input {
@@ -182,6 +206,11 @@
             <button class="add-btn" id="addButton">添加</button>
         </div>
         
+        <!-- 搜索区域 -->
+        <div class="search-section">
+            <input type="text" placeholder="搜索任务..." id="searchInput" class="search-input">
+        </div>
+        
         <!-- 任务列表 -->
         <ul class="task-list" id="taskList">
             <!-- 任务项将通过JavaScript动态生成 -->
@@ -193,6 +222,7 @@
         const taskInput = document.getElementById('taskInput');
         const addButton = document.getElementById('addButton');
         const taskList = document.getElementById('taskList');
+        const searchInput = document.getElementById('searchInput');
         
         // 生成唯一ID的辅助函数
         function generateId() {
@@ -243,6 +273,33 @@
                     createTaskElement(task.text, task.completed, task.id);
                 });
             }
+            
+            // 应用当前搜索过滤
+            filterTasks();
+        }
+        
+        // 搜索过滤任务函数
+        function filterTasks() {
+            // 获取搜索框的值并转换为小写
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            // 获取所有任务项
+            const taskItems = document.querySelectorAll('.task-item');
+            
+            // 遍历所有任务项
+            taskItems.forEach(item => {
+                // 获取任务内容并转换为小写
+                const taskContent = item.querySelector('.task-content').textContent.toLowerCase();
+                
+                // 检查任务内容是否包含搜索词
+                if (taskContent.includes(searchTerm)) {
+                    // 如果包含，显示任务项
+                    item.style.display = 'flex';
+                } else {
+                    // 如果不包含，隐藏任务项
+                    item.style.display = 'none';
+                }
+            });
         }
         
         // 创建任务元素的辅助函数
@@ -354,6 +411,9 @@
                 addTask();
             }
         });
+        
+        // 为搜索框添加输入事件监听器，实现实时搜索
+        searchInput.addEventListener('input', filterTasks);
         
         // 页面加载时，从localStorage加载任务
         document.addEventListener('DOMContentLoaded', function() {
