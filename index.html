@@ -376,7 +376,7 @@
             });
         }
         
-        // 按优先级排序任务函数（默认从高到低）
+        // 按优先级和完成状态排序任务函数
         function sortTasksByPriority() {
             // 获取所有任务项
             const taskItems = Array.from(document.querySelectorAll('.task-item'));
@@ -388,8 +388,20 @@
                 'low': 1
             };
             
-            // 排序任务项（高优先级在前）
+            // 排序任务项：未完成任务在前，已完成任务在后，同组内按优先级从高到低排序
             taskItems.sort((a, b) => {
+                // 获取任务完成状态
+                const taskContentA = a.querySelector('.task-content span:last-child');
+                const taskContentB = b.querySelector('.task-content span:last-child');
+                const isCompletedA = taskContentA.style.textDecoration === 'line-through';
+                const isCompletedB = taskContentB.style.textDecoration === 'line-through';
+                
+                // 如果完成状态不同，未完成的排在前面
+                if (isCompletedA !== isCompletedB) {
+                    return isCompletedA ? 1 : -1;
+                }
+                
+                // 如果完成状态相同，按优先级排序
                 const priorityA = a.dataset.priority || 'medium';
                 const priorityB = b.dataset.priority || 'medium';
                 const weightA = priorityWeights[priorityA];
@@ -484,6 +496,9 @@
             
             // 自动按优先级重新排序
             sortTasksByPriority();
+            
+            // 清除搜索框并显示所有任务
+            clearSearch();
         }
         
         // 完成任务函数
@@ -514,6 +529,9 @@
             
             // 自动按优先级重新排序
             sortTasksByPriority();
+            
+            // 清除搜索框并显示所有任务
+            clearSearch();
         }
         
         // 删除任务函数
@@ -532,6 +550,9 @@
             
             // 自动按优先级重新排序
             sortTasksByPriority();
+            
+            // 清除搜索框并显示所有任务
+            clearSearch();
         }
         
         // 修改任务优先级函数
@@ -557,6 +578,9 @@
             
             // 自动按优先级重新排序
             sortTasksByPriority();
+            
+            // 清除搜索框并显示所有任务
+            clearSearch();
         }
         
         // 为添加按钮添加点击事件监听器
@@ -569,6 +593,14 @@
             }
         });
         
+        // 清除搜索框函数
+        function clearSearch() {
+            if (searchInput.value.trim() !== '') {
+                searchInput.value = '';
+                filterTasks();
+            }
+        }
+
         // 为搜索框添加输入事件监听器，实现实时搜索
         searchInput.addEventListener('input', filterTasks);
         
