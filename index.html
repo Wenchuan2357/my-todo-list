@@ -127,11 +127,74 @@
             flex: 1;
             font-size: 16px;
             color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* 优先级标记样式 */
+        .priority-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .priority-high {
+            background-color: #e74c3c; /* 红色 - 高优先级 */
+        }
+        
+        .priority-medium {
+            background-color: #f39c12; /* 黄色 - 中优先级 */
+        }
+        
+        .priority-low {
+            background-color: #95a5a6; /* 灰色 - 低优先级 */
+        }
+        
+        /* 排序按钮样式 */
+        .sort-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 16px;
+        }
+        
+        .sort-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background-color: #ecf0f1;
+            color: #7f8c8d;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .sort-btn:hover {
+            background-color: #d5dbdb;
+        }
+        
+        .sort-btn.active {
+            background-color: #3498db;
+            color: white;
         }
         
         .task-actions {
             display: flex;
             gap: 8px;
+            align-items: center;
+        }
+        
+        .priority-change {
+            padding: 4px 8px;
+            border: 1px solid #e1e8ed;
+            border-radius: 4px;
+            font-size: 12px;
+            background-color: white;
+            cursor: pointer;
         }
         
         .complete-btn, .delete-btn {
@@ -203,8 +266,15 @@
         <!-- 输入区域 -->
         <div class="input-section">
             <input type="text" placeholder="添加新任务..." id="taskInput">
+            <select id="prioritySelect" class="priority-select">
+                <option value="medium">中优先级</option>
+                <option value="high">高优先级</option>
+                <option value="low">低优先级</option>
+            </select>
             <button class="add-btn" id="addButton">添加</button>
         </div>
+        
+
         
         <!-- 搜索区域 -->
         <div class="search-section">
@@ -223,6 +293,8 @@
         const addButton = document.getElementById('addButton');
         const taskList = document.getElementById('taskList');
         const searchInput = document.getElementById('searchInput');
+        const prioritySelect = document.getElementById('prioritySelect');
+
         
         // 生成唯一ID的辅助函数
         function generateId() {
@@ -237,17 +309,19 @@
             // 创建任务数组
             const tasks = [];
             
-            // 遍历所有任务项，提取任务内容和完成状态
+            // 遍历所有任务项，提取任务内容、完成状态和优先级
             taskItems.forEach(item => {
-                const taskContent = item.querySelector('.task-content');
+                const taskContent = item.querySelector('.task-content span');
                 const taskId = item.dataset.id; // 获取任务ID
                 const isCompleted = taskContent.style.textDecoration === 'line-through';
+                const priority = item.dataset.priority; // 获取任务优先级
                 
                 // 将任务信息添加到数组
                 tasks.push({
                     id: taskId,
                     text: taskContent.textContent,
-                    completed: isCompleted
+                    completed: isCompleted,
+                    priority: priority
                 });
             });
             
@@ -270,7 +344,7 @@
                 
                 // 遍历任务数组，创建任务项
                 tasks.forEach(task => {
-                    createTaskElement(task.text, task.completed, task.id);
+                    createTaskElement(task.text, task.completed, task.id, task.priority || 'medium');
                 });
             }
             
@@ -281,7 +355,7 @@
         // 搜索过滤任务函数
         function filterTasks() {
             // 获取搜索框的值并转换为小写
-            const searchTerm = searchInput.value.toLowerCase();
+            const searchTerm = searchInput.value.toLowerCase().trim();
             
             // 获取所有任务项
             const taskItems = document.querySelectorAll('.task-item');
@@ -289,11 +363,11 @@
             // 遍历所有任务项
             taskItems.forEach(item => {
                 // 获取任务内容并转换为小写
-                const taskContent = item.querySelector('.task-content').textContent.toLowerCase();
+                const taskContent = item.querySelector('.task-content span:last-child').textContent.toLowerCase();
                 
                 // 检查任务内容是否包含搜索词
-                if (taskContent.includes(searchTerm)) {
-                    // 如果包含，显示任务项
+                if (searchTerm === '' || taskContent.includes(searchTerm)) {
+                    // 如果搜索框为空或任务内容包含搜索词，显示任务项
                     item.style.display = 'flex';
                 } else {
                     // 如果不包含，隐藏任务项
@@ -302,11 +376,44 @@
             });
         }
         
+        // 按优先级排序任务函数（默认从高到低）
+        function sortTasksByPriority() {
+            // 获取所有任务项
+            const taskItems = Array.from(document.querySelectorAll('.task-item'));
+            
+            // 优先级权重映射
+            const priorityWeights = {
+                'high': 3,
+                'medium': 2,
+                'low': 1
+            };
+            
+            // 排序任务项（高优先级在前）
+            taskItems.sort((a, b) => {
+                const priorityA = a.dataset.priority || 'medium';
+                const priorityB = b.dataset.priority || 'medium';
+                const weightA = priorityWeights[priorityA];
+                const weightB = priorityWeights[priorityB];
+                
+                // 按优先级从高到低排序
+                return weightB - weightA;
+            });
+            
+            // 清空任务列表
+            taskList.innerHTML = '';
+            
+            // 重新添加排序后的任务项
+            taskItems.forEach(item => {
+                taskList.appendChild(item);
+            });
+        }
+        
         // 创建任务元素的辅助函数
-        function createTaskElement(text, isCompleted = false, id = null) {
+        function createTaskElement(text, isCompleted = false, id = null, priority = 'medium') {
             // 创建新的任务项
             const taskItem = document.createElement('li');
             taskItem.className = 'task-item';
+            taskItem.dataset.priority = priority; // 存储任务优先级
             
             // 如果没有提供ID，则生成一个新的
             const taskId = id || generateId();
@@ -314,20 +421,29 @@
             
             // 设置任务项的HTML内容
             taskItem.innerHTML = `
-                <span class="task-content">${text}</span>
+                <span class="task-content">
+                    <span class="priority-indicator priority-${priority}"></span>
+                    <span>${text}</span>
+                </span>
                 <div class="task-actions">
+                    <select class="priority-change" data-priority="${priority}">
+                        <option value="high" ${priority === 'high' ? 'selected' : ''}>高</option>
+                        <option value="medium" ${priority === 'medium' ? 'selected' : ''}>中</option>
+                        <option value="low" ${priority === 'low' ? 'selected' : ''}>低</option>
+                    </select>
                     <button class="complete-btn">${isCompleted ? '已完成' : '完成'}</button>
                     <button class="delete-btn">删除</button>
                 </div>
             `;
             
             // 如果任务已完成，设置相应的样式
-            const taskContent = taskItem.querySelector('.task-content');
+            const taskContent = taskItem.querySelector('.task-content span:last-child');
             const completeBtn = taskItem.querySelector('.complete-btn');
             
             if (isCompleted) {
                 taskContent.style.textDecoration = 'line-through';
                 taskContent.style.color = '#888';
+                completeBtn.textContent = '已完成';
                 completeBtn.style.backgroundColor = '#95a5a6';
             }
             
@@ -337,6 +453,10 @@
             // 为新添加的任务按钮添加事件监听器
             completeBtn.addEventListener('click', completeTask);
             taskItem.querySelector('.delete-btn').addEventListener('click', deleteTask);
+            
+            // 为优先级选择器添加变更事件监听器
+            const priorityChange = taskItem.querySelector('.priority-change');
+            priorityChange.addEventListener('change', changeTaskPriority);
         }
         
         // 添加任务函数
@@ -350,14 +470,20 @@
                 return;
             }
             
+            // 获取选择的优先级
+            const priority = prioritySelect.value;
+            
             // 创建新的任务元素
-            createTaskElement(taskText);
+            createTaskElement(taskText, false, null, priority);
             
             // 清空输入框
             taskInput.value = '';
             
             // 保存更新后的任务列表
             saveTasks();
+            
+            // 自动按优先级重新排序
+            sortTasksByPriority();
         }
         
         // 完成任务函数
@@ -366,7 +492,7 @@
             const completeBtn = event.target;
             
             // 获取任务内容元素
-            const taskContent = completeBtn.parentElement.previousElementSibling;
+            const taskContent = completeBtn.parentElement.previousElementSibling.querySelector('span:last-child');
             
             // 切换任务完成状态的样式
             if (taskContent.style.textDecoration === 'line-through') {
@@ -385,6 +511,9 @@
             
             // 保存更新后的任务列表
             saveTasks();
+            
+            // 自动按优先级重新排序
+            sortTasksByPriority();
         }
         
         // 删除任务函数
@@ -400,6 +529,34 @@
             
             // 保存更新后的任务列表
             saveTasks();
+            
+            // 自动按优先级重新排序
+            sortTasksByPriority();
+        }
+        
+        // 修改任务优先级函数
+        function changeTaskPriority(event) {
+            // 获取当前变更的优先级选择器
+            const prioritySelect = event.target;
+            
+            // 获取对应的任务项
+            const taskItem = prioritySelect.closest('.task-item');
+            
+            // 获取新的优先级
+            const newPriority = prioritySelect.value;
+            
+            // 更新任务项的优先级数据
+            taskItem.dataset.priority = newPriority;
+            
+            // 更新优先级指示器的样式
+            const priorityIndicator = taskItem.querySelector('.priority-indicator');
+            priorityIndicator.className = `priority-indicator priority-${newPriority}`;
+            
+            // 保存更新后的任务列表
+            saveTasks();
+            
+            // 自动按优先级重新排序
+            sortTasksByPriority();
         }
         
         // 为添加按钮添加点击事件监听器
@@ -415,9 +572,13 @@
         // 为搜索框添加输入事件监听器，实现实时搜索
         searchInput.addEventListener('input', filterTasks);
         
+
+        
         // 页面加载时，从localStorage加载任务
         document.addEventListener('DOMContentLoaded', function() {
             loadTasks();
+            // 页面加载完成后自动排序
+            sortTasksByPriority();
         });
     </script>
 </body>
