@@ -276,9 +276,12 @@
         
 
         
-        <!-- 搜索区域 -->
-        <div class="search-section">
-            <input type="text" placeholder="搜索任务..." id="searchInput" class="search-input">
+        <!-- 搜索和排序区域 -->
+        <div class="search-section" style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" placeholder="搜索任务..." id="searchInput" class="search-input" style="flex: 1;">
+            <button class="sort-btn" id="sortButton">
+                <span>排序</span>
+            </button>
         </div>
         
         <!-- 任务列表 -->
@@ -303,59 +306,104 @@
         
         // 保存任务到localStorage
         function saveTasks() {
-            // 获取所有任务项
-            const taskItems = document.querySelectorAll('.task-item');
-            
-            // 创建任务数组
-            const tasks = [];
-            
-            // 遍历所有任务项，提取任务内容、完成状态和优先级
-            taskItems.forEach(item => {
-                const taskContent = item.querySelector('.task-content span');
-                const taskId = item.dataset.id; // 获取任务ID
-                const isCompleted = taskContent.style.textDecoration === 'line-through';
-                const priority = item.dataset.priority; // 获取任务优先级
+            try {
+                // 获取所有任务项
+                const taskItems = document.querySelectorAll('.task-item');
                 
-                // 将任务信息添加到数组
-                tasks.push({
-                    id: taskId,
-                    text: taskContent.textContent,
-                    completed: isCompleted,
-                    priority: priority
+                // 创建任务数组
+                const tasks = [];
+                
+                // 遍历所有任务项，提取任务内容、完成状态和优先级
+                taskItems.forEach(item => {
+                    const taskContent = item.querySelector('.task-content span:last-child');
+                    if (!taskContent) return; // 跳过无效的任务项
+                    
+                    const taskId = item.dataset.id; // 获取任务ID
+                    const isCompleted = taskContent.style.textDecoration === 'line-through';
+                    const priority = item.dataset.priority || 'medium'; // 获取任务优先级，默认为中优先级
+                    
+                    // 将任务信息添加到数组
+                    tasks.push({
+                        id: taskId,
+                        text: taskContent.textContent,
+                        completed: isCompleted,
+                        priority: priority
+                    });
                 });
-            });
-            
-            // 将任务数组转换为JSON字符串并保存到localStorage
-            localStorage.setItem('todoList', JSON.stringify(tasks));
+                
+                // 将任务数组转换为JSON字符串并保存到localStorage
+                if (typeof Storage !== 'undefined') {
+                    localStorage.setItem('todoList', JSON.stringify(tasks));
+                }
+            } catch (error) {
+                console.error('保存任务失败:', error);
+            }
         }
         
         // 从localStorage加载任务
         function loadTasks() {
-            // 从localStorage获取保存的任务
-            const savedTasks = localStorage.getItem('todoList');
-            
-            // 检查是否有保存的任务
-            if (savedTasks) {
-                // 将JSON字符串解析为任务数组
-                const tasks = JSON.parse(savedTasks);
+            try {
+                // 检查localStorage是否可用
+                if (typeof Storage === 'undefined') {
+                    console.warn('localStorage不可用，无法加载保存的任务');
+                    return;
+                }
                 
-                // 清空当前任务列表
-                taskList.innerHTML = '';
+                // 从localStorage获取保存的任务
+                const savedTasks = localStorage.getItem('todoList');
                 
-                // 遍历任务数组，创建任务项
-                tasks.forEach(task => {
-                    createTaskElement(task.text, task.completed, task.id, task.priority || 'medium');
-                });
+                // 检查是否有保存的任务
+                if (savedTasks) {
+                    try {
+                        // 将JSON字符串解析为任务数组
+                        const tasks = JSON.parse(savedTasks);
+                        
+                        // 验证tasks是否为数组
+                        if (!Array.isArray(tasks)) {
+                            console.error('保存的任务数据格式不正确');
+                            return;
+                        }
+                        
+                        // 清空当前任务列表
+                        taskList.innerHTML = '';
+                        
+                        // 遍历任务数组，创建任务项
+                        tasks.forEach(task => {
+                            // 验证任务对象的必要属性
+                            if (task && typeof task.text === 'string') {
+                                createTaskItem(
+                                    task.text, 
+                                    Boolean(task.completed), 
+                                    task.id, 
+                                    task.priority || 'medium'
+                                );
+                            }
+                        });
+                    } catch (parseError) {
+                        console.error('解析任务数据失败:', parseError);
+                    }
+                }
+            } catch (error) {
+                console.error('加载任务失败:', error);
+            } finally {
+                // 应用当前搜索过滤
+                filterTasks();
             }
-            
-            // 应用当前搜索过滤
-            filterTasks();
         }
         
         // 搜索过滤任务函数
         function filterTasks() {
             // 获取搜索框的值并转换为小写
             const searchTerm = searchInput.value.toLowerCase().trim();
+            
+            // 如果搜索词为空，显示所有任务项
+            if (searchTerm === '') {
+                const taskItems = document.querySelectorAll('.task-item');
+                taskItems.forEach(item => {
+                    item.style.display = 'flex';
+                });
+                return;
+            }
             
             // 获取所有任务项
             const taskItems = document.querySelectorAll('.task-item');
@@ -366,76 +414,90 @@
                 const taskContent = item.querySelector('.task-content span:last-child').textContent.toLowerCase();
                 
                 // 检查任务内容是否包含搜索词
-                if (searchTerm === '' || taskContent.includes(searchTerm)) {
-                    // 如果搜索框为空或任务内容包含搜索词，显示任务项
-                    item.style.display = 'flex';
-                } else {
-                    // 如果不包含，隐藏任务项
-                    item.style.display = 'none';
-                }
+                item.style.display = taskContent.includes(searchTerm) ? 'flex' : 'none';
             });
         }
         
         // 按优先级和完成状态排序任务函数
-        function sortTasksByPriority() {
-            // 获取所有任务项
-            const taskItems = Array.from(document.querySelectorAll('.task-item'));
-            
-            // 优先级权重映射
-            const priorityWeights = {
-                'high': 3,
-                'medium': 2,
-                'low': 1
-            };
-            
-            // 排序任务项：未完成任务在前，已完成任务在后，同组内按优先级从高到低排序
-            taskItems.sort((a, b) => {
-                // 获取任务完成状态
-                const taskContentA = a.querySelector('.task-content span:last-child');
-                const taskContentB = b.querySelector('.task-content span:last-child');
-                const isCompletedA = taskContentA.style.textDecoration === 'line-through';
-                const isCompletedB = taskContentB.style.textDecoration === 'line-through';
+        function sortTasksByStatusAndPriority() {
+            try {
+                // 获取所有任务项
+                const taskItems = Array.from(document.querySelectorAll('.task-item'));
                 
-                // 如果完成状态不同，未完成的排在前面
-                if (isCompletedA !== isCompletedB) {
-                    return isCompletedA ? 1 : -1;
+                // 如果没有任务项，直接返回
+                if (taskItems.length === 0) return;
+                
+                // 优先级权重映射（常量）
+                const PRIORITY_WEIGHTS = {
+                    'high': 3,
+                    'medium': 2,
+                    'low': 1
+                };
+                
+                // 预处理任务项数据，避免在排序比较函数中重复DOM查询
+                const tasksWithData = taskItems.map(task => {
+                    const taskContent = task.querySelector('.task-content span:last-child');
+                    return {
+                        element: task,
+                        isCompleted: taskContent ? taskContent.style.textDecoration === 'line-through' : false,
+                        priority: task.dataset.priority || 'medium'
+                    };
+                });
+                
+                // 排序任务数据
+                tasksWithData.sort((a, b) => {
+                    // 如果完成状态不同，未完成的排在前面
+                    if (a.isCompleted !== b.isCompleted) {
+                        return a.isCompleted ? 1 : -1;
+                    }
+                    
+                    // 如果完成状态相同，按优先级排序
+                    const weightA = PRIORITY_WEIGHTS[a.priority] || 2;
+                    const weightB = PRIORITY_WEIGHTS[b.priority] || 2;
+                    
+                    // 按优先级从高到低排序
+                    return weightB - weightA;
+                });
+                
+                // 保存当前的搜索状态
+                const currentSearchTerm = searchInput.value;
+                
+                // 使用文档片段优化DOM操作
+                const fragment = document.createDocumentFragment();
+                tasksWithData.forEach(taskData => {
+                    fragment.appendChild(taskData.element);
+                });
+                
+                // 一次性更新DOM
+                taskList.innerHTML = '';
+                taskList.appendChild(fragment);
+                
+                // 恢复搜索状态
+                if (currentSearchTerm) {
+                    searchInput.value = currentSearchTerm;
+                    filterTasks();
                 }
-                
-                // 如果完成状态相同，按优先级排序
-                const priorityA = a.dataset.priority || 'medium';
-                const priorityB = b.dataset.priority || 'medium';
-                const weightA = priorityWeights[priorityA];
-                const weightB = priorityWeights[priorityB];
-                
-                // 按优先级从高到低排序
-                return weightB - weightA;
-            });
-            
-            // 清空任务列表
-            taskList.innerHTML = '';
-            
-            // 重新添加排序后的任务项
-            taskItems.forEach(item => {
-                taskList.appendChild(item);
-            });
+            } catch (error) {
+                console.error('任务排序失败:', error);
+            }
         }
         
-        // 创建任务元素的辅助函数
-        function createTaskElement(text, isCompleted = false, id = null, priority = 'medium') {
+        // 创建任务项的辅助函数
+        function createTaskItem(taskText, isCompleted = false, taskId = null, priority = 'medium') {
             // 创建新的任务项
             const taskItem = document.createElement('li');
             taskItem.className = 'task-item';
             taskItem.dataset.priority = priority; // 存储任务优先级
             
             // 如果没有提供ID，则生成一个新的
-            const taskId = id || generateId();
-            taskItem.dataset.id = taskId; // 存储任务ID
+            const newTaskId = taskId || generateId();
+            taskItem.dataset.id = newTaskId; // 存储任务ID
             
             // 设置任务项的HTML内容
             taskItem.innerHTML = `
                 <span class="task-content">
                     <span class="priority-indicator priority-${priority}"></span>
-                    <span>${text}</span>
+                    <span>${taskText}</span>
                 </span>
                 <div class="task-actions">
                     <select class="priority-change" data-priority="${priority}">
@@ -449,26 +511,26 @@
             `;
             
             // 如果任务已完成，设置相应的样式
-            const taskContent = taskItem.querySelector('.task-content span:last-child');
-            const completeBtn = taskItem.querySelector('.complete-btn');
+            const taskContentElement = taskItem.querySelector('.task-content span:last-child');
+            const completeButton = taskItem.querySelector('.complete-btn');
             
             if (isCompleted) {
-                taskContent.style.textDecoration = 'line-through';
-                taskContent.style.color = '#888';
-                completeBtn.textContent = '已完成';
-                completeBtn.style.backgroundColor = '#95a5a6';
+                taskContentElement.style.textDecoration = 'line-through';
+                taskContentElement.style.color = '#888';
+                completeButton.textContent = '已完成';
+                completeButton.style.backgroundColor = '#95a5a6';
             }
             
             // 将新任务添加到列表中
             taskList.appendChild(taskItem);
             
             // 为新添加的任务按钮添加事件监听器
-            completeBtn.addEventListener('click', completeTask);
+            completeButton.addEventListener('click', completeTask);
             taskItem.querySelector('.delete-btn').addEventListener('click', deleteTask);
             
             // 为优先级选择器添加变更事件监听器
-            const priorityChange = taskItem.querySelector('.priority-change');
-            priorityChange.addEventListener('change', changeTaskPriority);
+            const prioritySelect = taskItem.querySelector('.priority-change');
+            prioritySelect.addEventListener('change', changeTaskPriority);
         }
         
         // 添加任务函数
@@ -486,7 +548,7 @@
             const priority = prioritySelect.value;
             
             // 创建新的任务元素
-            createTaskElement(taskText, false, null, priority);
+            createTaskItem(taskText, false, null, priority);
             
             // 清空输入框
             taskInput.value = '';
@@ -494,8 +556,8 @@
             // 保存更新后的任务列表
             saveTasks();
             
-            // 自动按优先级重新排序
-            sortTasksByPriority();
+            // 自动按状态和优先级重新排序
+            sortTasksByStatusAndPriority();
             
             // 清除搜索框并显示所有任务
             clearSearch();
@@ -503,81 +565,100 @@
         
         // 完成任务函数
         function completeTask(event) {
-            // 获取当前点击的按钮
-            const completeBtn = event.target;
-            
-            // 获取任务内容元素
-            const taskContent = completeBtn.parentElement.previousElementSibling.querySelector('span:last-child');
-            
-            // 切换任务完成状态的样式
-            if (taskContent.style.textDecoration === 'line-through') {
-                // 如果已经是完成状态，则取消完成状态
-                taskContent.style.textDecoration = 'none';
-                taskContent.style.color = '#333';
-                completeBtn.textContent = '完成';
-                completeBtn.style.backgroundColor = '#2ecc71';
-            } else {
-                // 如果未完成，则标记为完成状态
-                taskContent.style.textDecoration = 'line-through';
-                taskContent.style.color = '#888';
-                completeBtn.textContent = '已完成';
-                completeBtn.style.backgroundColor = '#95a5a6';
+            try {
+                // 获取当前点击的按钮
+                const completeBtn = event.target;
+                if (!completeBtn) return;
+                
+                // 获取任务项
+                const taskItem = completeBtn.closest('.task-item');
+                if (!taskItem) return;
+                
+                // 获取任务内容元素
+                const taskContent = taskItem.querySelector('.task-content span:last-child');
+                if (!taskContent) return;
+                
+                // 切换任务完成状态的样式
+                if (taskContent.style.textDecoration === 'line-through') {
+                    // 如果已经是完成状态，则取消完成状态
+                    taskContent.style.textDecoration = 'none';
+                    taskContent.style.color = '#333';
+                    completeBtn.textContent = '完成';
+                    completeBtn.style.backgroundColor = '#2ecc71';
+                } else {
+                    // 如果未完成，则标记为完成状态
+                    taskContent.style.textDecoration = 'line-through';
+                    taskContent.style.color = '#888';
+                    completeBtn.textContent = '已完成';
+                    completeBtn.style.backgroundColor = '#95a5a6';
+                }
+                
+                // 执行任务更新后的通用操作
+                handleTaskUpdate();
+            } catch (error) {
+                console.error('完成任务操作失败:', error);
             }
-            
-            // 保存更新后的任务列表
-            saveTasks();
-            
-            // 自动按优先级重新排序
-            sortTasksByPriority();
-            
-            // 清除搜索框并显示所有任务
-            clearSearch();
         }
         
         // 删除任务函数
         function deleteTask(event) {
-            // 获取当前点击的按钮
-            const deleteBtn = event.target;
-            
-            // 获取要删除的任务项
-            const taskItem = deleteBtn.closest('.task-item');
-            
-            // 从列表中移除任务项
-            taskList.removeChild(taskItem);
-            
-            // 保存更新后的任务列表
-            saveTasks();
-            
-            // 自动按优先级重新排序
-            sortTasksByPriority();
-            
-            // 清除搜索框并显示所有任务
-            clearSearch();
+            try {
+                // 获取当前点击的按钮
+                const deleteBtn = event.target;
+                if (!deleteBtn) return;
+                
+                // 获取要删除的任务项
+                const taskItem = deleteBtn.closest('.task-item');
+                if (!taskItem || !taskList.contains(taskItem)) return;
+                
+                // 从列表中移除任务项
+                taskList.removeChild(taskItem);
+                
+                // 执行任务更新后的通用操作
+                handleTaskUpdate();
+            } catch (error) {
+                console.error('删除任务操作失败:', error);
+            }
         }
         
         // 修改任务优先级函数
         function changeTaskPriority(event) {
-            // 获取当前变更的优先级选择器
-            const prioritySelect = event.target;
-            
-            // 获取对应的任务项
-            const taskItem = prioritySelect.closest('.task-item');
-            
-            // 获取新的优先级
-            const newPriority = prioritySelect.value;
-            
-            // 更新任务项的优先级数据
-            taskItem.dataset.priority = newPriority;
-            
-            // 更新优先级指示器的样式
-            const priorityIndicator = taskItem.querySelector('.priority-indicator');
-            priorityIndicator.className = `priority-indicator priority-${newPriority}`;
-            
+            try {
+                // 获取当前变更的优先级选择器
+                const prioritySelect = event.target;
+                if (!prioritySelect) return;
+                
+                // 获取对应的任务项
+                const taskItem = prioritySelect.closest('.task-item');
+                if (!taskItem) return;
+                
+                // 获取新的优先级
+                const newPriority = prioritySelect.value;
+                if (!['high', 'medium', 'low'].includes(newPriority)) {
+                    console.warn('无效的优先级值:', newPriority);
+                    return;
+                }
+                
+                // 更新任务项的优先级数据
+                taskItem.dataset.priority = newPriority;
+                
+                // 更新优先级指示器的样式
+                const priorityIndicator = taskItem.querySelector('.priority-indicator');
+                if (priorityIndicator) {
+                    priorityIndicator.className = `priority-indicator priority-${newPriority}`;
+                }
+                
+                // 执行任务更新后的通用操作
+                handleTaskUpdate();
+            } catch (error) {
+                console.error('修改优先级操作失败:', error);
+            }
+        }
+        
+        // 任务更新后的通用操作函数
+        function handleTaskUpdate() {
             // 保存更新后的任务列表
             saveTasks();
-            
-            // 自动按优先级重新排序
-            sortTasksByPriority();
             
             // 清除搜索框并显示所有任务
             clearSearch();
@@ -601,8 +682,16 @@
             }
         }
 
-        // 为搜索框添加输入事件监听器，实现实时搜索
-        searchInput.addEventListener('input', filterTasks);
+        // 为搜索框添加输入事件监听器，实现实时搜索（带防抖）
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(filterTasks, 100); // 100ms防抖延迟
+        });
+        
+        // 为排序按钮添加点击事件监听器
+        const sortButton = document.getElementById('sortButton');
+        sortButton.addEventListener('click', sortTasksByStatusAndPriority);
         
 
         
@@ -610,7 +699,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadTasks();
             // 页面加载完成后自动排序
-            sortTasksByPriority();
+            sortTasksByStatusAndPriority();
         });
     </script>
 </body>
